@@ -14,10 +14,12 @@
     #define INADDR_LOOPBACK ((u_long)0x7f000001)
 
 	int socket_connect(m_socket_info_t* m_socket_info){
+	    printf("%s entry\n", __func__);
 		if( connect(m_socket_info->sockfd, (struct sockaddr*)&(m_socket_info->servaddr), sizeof(m_socket_info->servaddr)) < 0){  
 				printf("connect error: %s(errno: %d)\n",strerror(errno),errno);  
 				return -1;  
 				}  
+		printf("%s\n", __func__);
 		return 0;
 
 	}
@@ -52,8 +54,7 @@
 		return 0;
 	}
 	int socket_recv(m_socket_info_t* m_socket_info){
-		int rec_len;  
-		printf("begin to socket_recv\n");
+		int rec_len;
 		if((rec_len = recv(m_socket_info->sockfd, m_socket_info->buf, MAXLINE,0)) == -1) {  
 				   printf("recv error");  
 				   return -1; 
@@ -67,32 +68,66 @@
 		return 0;
 
 	}
+
+	static void *_client_recv_loop(void *handle){
+		int ret;
+		m_socket_info_t* m_socket_info = (m_socket_info_t*)handle;
+		while(1){
+			printf("begin to socket_recv\n");
+			ret = socket_recv(m_socket_info);
+			printf("ret:%d,recv:%s\n", ret, m_socket_info->buf);
+
+		}
+		
+
+	}
 	
 	int send_and_recv_msg_once()  
 		{  
 			int ret;
+			int retry = 0;
 			char buf[] = "orenda_socket_info";
 			m_socket_info_t* m_socket_info;
 			//extern void *malloc(unsigned int num_bytes);
+
+			pthread_t m_client_recv_thread;
+
+			
 			m_socket_info = malloc(sizeof(m_socket_info_t));
 			if(m_socket_info == NULL){
 				printf("malloc fail\n");
 				return -1;
 			}
 			ret = socket_init(m_socket_info);
-			
+			ret = pthread_create(&m_client_recv_thread, NULL, _client_recv_loop, (void *)m_socket_info);
+    if(ret != 0) {
+        printf("can't create thread (%d:%s)", ret, strerror(ret));
+        ret = -1;
+    }
 				//ret = socket_connect(m_socket_info);// ??? i guess that it can be true ,or why set already connected?
+				//fgets(buf,MAXLINE, stdin);//char *fgets(char *str, int n, FILE *stream);
+				//if(strcmp(buf, "q\n") == 0) return -1;
+			//ret = socket_send(m_socket_info, buf, sizeof(buf));
+			//ret = socket_recv(m_socket_info);
+			//printf("ret:%d,recv:%s\n", ret, m_socket_info->buf);
+			//usleep(1000*1000*20);
+			while(retry<5){
+				//usleep(1000*1000*2);
 				fgets(buf,MAXLINE, stdin);//char *fgets(char *str, int n, FILE *stream);
 				if(strcmp(buf, "q\n") == 0) return -1;
-			ret = socket_send(m_socket_info, buf, sizeof(buf));
-			ret = socket_recv(m_socket_info);
-			printf("ret:%d,recv:%s\n", ret, m_socket_info->buf);
+				//strcpy(buf, "client_send_msg\n");
+				printf("SEND:%s\n", buf);
+				ret = socket_send(m_socket_info, buf, sizeof(buf));
+				retry++;
+			}
+			pthread_join(&m_client_recv_thread, NULL);
 			ret = socket_deinit(m_socket_info);
 			return ret;
 		}  
 	int main(int argc,char** argv){
 		int ret;
 		while(1){
+			usleep(1000*1000);
 			 ret = send_and_recv_msg_once();
 			if(ret<0) break;
 		}
