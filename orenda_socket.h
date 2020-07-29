@@ -3,7 +3,7 @@
 #include<netinet/in.h>
 
 #define MAXLINE 4096
-#define DEFAULT_PORT 8000
+#define DEFAULT_PORT 8002
 
 
 typedef struct orenda_socket_info {

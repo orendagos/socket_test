@@ -12,7 +12,9 @@
 
 #define MAXLINE 4096
 // copy from android
-#define INADDR_LOOPBACK ((u_long)0x7f000001)
+//#define INADDR_LOOPBACK ((u_long)0x7f000001)
+#define TARGET_IP ((u_long)0x7f000001)
+
 
 int socket_connect(m_socket_info_t* m_socket_info)
 {
@@ -35,7 +37,7 @@ int socket_init(m_socket_info_t* m_socket_info)
     memset(&(m_socket_info->servaddr), 0, sizeof(m_socket_info->servaddr));
     m_socket_info->servaddr.sin_family = AF_INET;
     m_socket_info->servaddr.sin_port = htons(DEFAULT_PORT);
-    m_socket_info->servaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    m_socket_info->servaddr.sin_addr.s_addr = htonl(TARGET_IP);
     /*
     if( inet_pton(AF_INET, argv[1], &servaddr.sin_addr) <= 0){
     printf("inet_pton error for %s\n",argv[1]);
@@ -72,6 +74,7 @@ int socket_recv(m_socket_info_t* m_socket_info)
 }
 int socket_deinit(m_socket_info_t* m_socket_info)
 {
+	printf("%s entry\n", __func__);
     close(m_socket_info->sockfd);
     return 0;
 
@@ -81,7 +84,7 @@ static void *_client_recv_loop(void *handle)
 {
     int ret;
     m_socket_info_t* m_socket_info = (m_socket_info_t*)handle;
-    usleep(1000*1000*10);
+    //usleep(1000*1000*10);
     do {
         printf("begin to socket_recv\n");
         ret = socket_recv(m_socket_info);
@@ -90,17 +93,47 @@ static void *_client_recv_loop(void *handle)
             printf("socket_recv ret:%d,errno:%d, And stop recving\n", ret, errno);
             break;
         } else if(ret==0) { // didn't get msg from server,maybe the connection is unconnected.
-            printf("EOS.  Closing command socket.\n");
+            printf("receive null, Closing command socket.\n");
             break;
         }
         printf("errno:%d,ret:%d,RECV:%s\n", errno, ret, m_socket_info->buf);
 
 
     } while((errno==11)|| (errno==0));
-    printf("ret = %d, errno = %d", ret, errno);
+    printf("ret = %d, errno = %d\n", ret, errno);
 
 }
+static void *_pthread_loop(void *handle)
+{
 
+	printf("%s entry\n", __func__);
+
+	//usleep(1000*1000*1);
+	printf("%s exit\n", __func__);
+}
+
+int pthread_test(){
+int ret;
+pthread_t m_client_recv_thread;
+//m_socket_info_t* m_socket_info;
+
+printf("%s entry\n", __func__);
+
+//ret = pthread_create(&m_client_recv_thread, NULL, _pthread_loop, (void *)m_socket_info);
+ret = pthread_create(&m_client_recv_thread, NULL, _pthread_loop, NULL);
+
+if(ret != 0) {
+        printf("can't create thread (%d:%s)", ret, strerror(ret));
+        ret = -1;
+		return ret;
+    }
+	printf("%s begin to pthread_join\n", __func__);
+	pthread_join(m_client_recv_thread, NULL);// pthread_join(&m_client_recv_thread, NULL); will influence the former print
+	printf("%s end to pthread_join\n", __func__);
+	return ret;
+
+
+}
 int send_and_recv_msg_once()
 {
     int ret;
@@ -112,39 +145,49 @@ int send_and_recv_msg_once()
     pthread_t m_client_recv_thread;
 
 
-    m_socket_info = malloc(sizeof(m_socket_info_t));
+    m_socket_info = (m_socket_info_t*)malloc(sizeof(m_socket_info_t));
     if(m_socket_info == NULL) {
         printf("malloc fail\n");
         return -1;
     }
-    ret = socket_init(m_socket_info);
+
+	ret = socket_init(m_socket_info);
+
     ret = pthread_create(&m_client_recv_thread, NULL, _client_recv_loop, (void *)m_socket_info);
+
     if(ret != 0) {
         printf("can't create thread (%d:%s)", ret, strerror(ret));
         ret = -1;
     }
-    usleep(1000*1000*10);
+
+    
+
     while(retry<5) {
 
         fgets(buf,MAXLINE, stdin);//char *fgets(char *str, int n, FILE *stream);
-        if(strcmp(buf, "q\n") == 0) return -1;
-        //strcpy(buf, "client_send_msg\n");
+        if(strcmp(buf, "q\n") == 0) break;
         printf("SEND:%s\n", buf);
         ret = socket_send(m_socket_info, buf, sizeof(buf));
         retry++;
     }
-    pthread_join(&m_client_recv_thread, NULL);
+    printf("mark0:%s\n", buf);
     ret = socket_deinit(m_socket_info);
+
+	printf("mark00\n");
+	pthread_join(m_client_recv_thread, NULL);
+	printf("mark1\n");
+	free(m_socket_info);
     return ret;
 }
 int main(int argc,char** argv)
 {
     int ret;
-    while(1) {
-        usleep(1000*1000);
-        ret = send_and_recv_msg_once();
-        if(ret<0) break;
-    }
+    //while(1) {
+        //usleep(1000*1000);
+     ret = send_and_recv_msg_once();
+    //pthread_test();
+        //if(ret<0) break;
+    //}
     return 0;
 
 

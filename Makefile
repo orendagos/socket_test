@@ -12,7 +12,7 @@ all: ${target}
 client: client.o orenda_socket.h
 	$(CC) -o client client.c -lpthread
 server: server.o orenda_socket.h
-	$(CC) -o server server.c -lpthread
+	$(CC) -g -o server server.c -lpthread
 
 clean:
 	rm -rf $(obj) ${target}

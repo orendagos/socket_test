@@ -26,7 +26,7 @@ int server_init(m_socket_server_t* orenda_server_info_t)
         exit(0);
     }
     //开始监听是否有客户端连接
-    if( listen(orenda_server_info_t->socket_fd, 10) == -1) {
+    if( listen(orenda_server_info_t->socket_fd, 10) == -1) {// 是否会阻塞???
         printf("listen socket error: %s(errno: %d)\n",strerror(errno),errno);
         exit(0);
     }
@@ -46,10 +46,11 @@ int server_recv(m_socket_server_t* orenda_server_info_t)
 
     printf("orenda_server_info_t->connect_fd:%d\n", orenda_server_info_t->connect_fd);
     n = recv(orenda_server_info_t->connect_fd, orenda_server_info_t->buff, MAXLINE, 0);
-    orenda_server_info_t->buff[n] = '\0';
+    orenda_server_info_t->buff[n] = '\0';// mov this out ,to keep the code clean.
     printf("RECV: %s\n", orenda_server_info_t->buff);
 
-    return n+1;
+    //return n+1;
+    return n;// just receiver n bytes.
 }
 int server_send(m_socket_server_t* orenda_server_info_t, void* buf, size_t len)
 {
@@ -85,6 +86,8 @@ static void *_server_recv_func(void *handle)
         }
     } while((errno==11)|| (errno==0));
     printf("ret = %d, errno = %d", ret, errno);
+	// 728
+	//exit(0);
 }
 
 static void *_server_send_func(void *handle)
@@ -97,11 +100,12 @@ static void *_server_send_func(void *handle)
 
     while(retry<5) {
         fgets(buf,MAXLINE, stdin);//char *fgets(char *str, int n, FILE *stream);
-        if(strcmp(buf, "q\n") == 0) return -1;
-        printf("begin to SEND[len:%d]:%s\n", strlen(buf), buf);
+        
+        printf("begin to SEND[len:%zu]:%s\n", strlen(buf), buf);
         ret = server_send(orenda_server_info_t, (char*)buf, strlen(buf));
         printf("end to SEND\n");
         retry ++;
+		if(strcmp(buf, "q\n") == 0) return;
     }
 }
 
@@ -131,8 +135,8 @@ static void *_server_thread_loop(void *handle)
     printf("mark pthread_create successfully\n");
     //usleep(1000*1000*5);
 
-    pthread_join(&server_send_thread, NULL);
-    pthread_join(&server_recv_thread, NULL);
+    pthread_join(server_send_thread, NULL);
+    pthread_join(server_recv_thread, NULL);
     return NULL;
 
 }
@@ -165,7 +169,7 @@ int main()
             ret = -1;
         }
         */
-    pthread_join(&m_server_thread, NULL);
+    pthread_join(m_server_thread, NULL);
     ret = server_deinit(orenda_server_info_t);
 
     return ret;
